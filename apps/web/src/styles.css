@@ -481,6 +481,13 @@ textarea:focus-visible {
   letter-spacing: -0.061em;
   margin-left: -4px;
 }
+.hero-copy > .hero-credit {
+  margin: 0 0 10px;
+  color: #6a745e;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
 .hero-copy > p {
   color: #696e61;
   font-size: 14px;
@@ -5152,6 +5159,10 @@ td {
     max-width: 520px;
     letter-spacing: -0.057em;
   }
+  .hero-copy > .hero-credit {
+    margin-bottom: 9px;
+    font-size: 11px;
+  }
   .hero-copy {
     max-width: 550px;
   }
@@ -6566,6 +6577,9 @@ td {
 @media (max-width: 380px) {
   .hero h1 {
     font-size: 61px;
+  }
+  .hero-copy > .hero-credit {
+    font-size: 10px;
   }
   .hero-kicker {
     font-size: 9px;

@@ -96,6 +96,7 @@ export default function Home() {
               </span>
               <span>A better future for honey starts at the hive.</span>
             </div>
+            <p className="hero-credit">Created by fsociety</p>
             <h1>
               From hive
               <br />
