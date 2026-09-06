@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.wrangler/
+.local/
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+playwright-report/
+test-results/
+artifacts/
+cache/
+*.log
+package-lock.json
