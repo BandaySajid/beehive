@@ -18,7 +18,9 @@ import {
   Menu,
   Network,
   Plus,
+  ScanEye,
   ScanLine,
+  TrendingUp,
   ShieldCheck,
   TriangleAlert,
   X,
@@ -68,6 +70,8 @@ export default function Shell() {
         ["/dashboard", "Overview", LayoutDashboard],
         ["/hives", "Hive intelligence", Hexagon],
         ["/batches", "Honey batches", Boxes],
+        ["/scan", "AI vision scan", ScanEye],
+        ["/forecast", "Risk forecast", TrendingUp],
       ];
   return (
     <div className="app-shell">
@@ -201,9 +205,13 @@ export default function Shell() {
                   ? "Hive intelligence"
                   : location.pathname.startsWith("/batches")
                     ? "Honey batches"
-                    : location.pathname.startsWith("/demo")
-                      ? "Tamper lab"
-                      : "Overview"}
+                    : location.pathname.startsWith("/scan")
+                      ? "AI vision scan"
+                      : location.pathname.startsWith("/forecast")
+                        ? "Risk forecast"
+                        : location.pathname.startsWith("/demo")
+                          ? "Tamper lab"
+                          : "Overview"}
             </strong>
           </div>
           <div className="topbar-right">

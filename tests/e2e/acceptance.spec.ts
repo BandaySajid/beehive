@@ -258,3 +258,60 @@ test("reduced motion, public accessibility, and keyboard proof drawer", async ({
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await expect(proof).toBeFocused();
 });
+test("AI vision scan reports and the market risk forecast stay grounded in real data", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await login(page);
+  await page.goto("/scan");
+  await expect(
+    page.getByRole("heading", { name: "Scan a hive, a frame, or a site." }),
+  ).toBeVisible();
+  await expect(page.getByRole("radio")).toHaveCount(4);
+  await page.getByRole("radio", { name: /Digital twin/ }).click();
+  await expect(
+    page.getByRole("radio", { name: /Digital twin/ }),
+  ).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText(/the same clip always returns/)).toBeVisible();
+  await page.getByRole("link", { name: /SCAN-TWIN001/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Digital twin", level: 1 }),
+  ).toBeVisible();
+  await expect(page.getByText("Simulated prototype scan")).toBeVisible();
+  await expect(page.getByText("Modelled hive weight")).toBeVisible();
+  await expect(page.locator(".twin-hive svg")).toBeVisible();
+  await expect(
+    page.getByText(/Expect roughly .* kg of extractable honey/),
+  ).toBeVisible();
+  await expect(page.getByText(/never enters the certified record/)).toHaveCount(
+    0,
+  );
+  await expect(page.getByText(/not a diagnostic instrument/)).toBeVisible();
+  await page.goto("/scan/SCAN-SITE001");
+  await expect(page.getByText("Where to put the hive")).toBeVisible();
+  await expect(page.locator(".placement-spots .spot")).toHaveCount(3);
+  await page.goto("/forecast");
+  await expect(
+    page.getByRole("heading", { name: "Predicted reputation risk" }),
+  ).toBeVisible();
+  const reviewCount = page.locator(".review-feed li");
+  await expect(reviewCount.first()).toBeVisible();
+  const before = await page
+    .locator(".scan-verdict .badge", { hasText: "reviews" })
+    .innerText();
+  await page.getByRole("button", { name: "Receive a consumer review" }).click();
+  await expect(page.getByText("A new consumer review landed.")).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.locator(".scan-verdict .badge", { hasText: "reviews" }).innerText(),
+    )
+    .not.toBe(before);
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(
+    accessibility.violations.map((v) => ({ id: v.id, impact: v.impact })),
+  ).toEqual([]);
+  expect(errors).toEqual([]);
+});

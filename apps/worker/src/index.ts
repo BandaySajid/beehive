@@ -16,6 +16,7 @@ import batches from "./batches";
 import documents from "./documents";
 import auth, { authenticated } from "./auth";
 import hives, { iot } from "./hives";
+import scans from "./scans";
 import { producerFilter } from "./core";
 
 export function isAllowedOrigin(origin: string | undefined | null, configuredAppUrl: string) {
@@ -120,6 +121,7 @@ app.route("/api/demo", demo);
 app.route("/api/authority", authority);
 app.route("/api/documents", documents);
 app.route("/api/hives", hives);
+app.route("/api/scans", scans);
 app.route("/api/iot", iot);
 app.get("/api/apiaries", authenticated, async (c) => {
   const f = producerFilter(c);

@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { buildSync } from "esbuild";
-import { readFileSync, openSync, mkdirSync } from "node:fs";
+import { readFileSync, readdirSync, openSync, mkdirSync } from "node:fs";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
   createPublicClient,
@@ -19,7 +19,12 @@ import {
   sha256,
 } from "../packages/shared/src/canonical";
 import { assessRisk } from "../packages/risk-engine/src/index";
-import type { Batch, Verification } from "../packages/shared/src/index";
+import type {
+  Batch,
+  ReputationForecast,
+  Scan,
+  Verification,
+} from "../packages/shared/src/index";
 let mf: Miniflare,
   chainProcess: ChildProcess,
   producerCookie = "",
@@ -145,7 +150,8 @@ beforeAll(async () => {
     }),
   );
   const db = await mf.getD1Database("DB");
-  await db.exec(readFileSync("migrations/0001_initial.sql", "utf8"));
+  for (const file of readdirSync("migrations").sort())
+    await db.exec(readFileSync(`migrations/${file}`, "utf8"));
   const r = { ...goldenRecord };
   const assessment = assessRisk(r, {
     now: "2026-09-06T09:00:00.000Z",
@@ -379,6 +385,102 @@ describe("Worker security and validation", () => {
     );
     expect(file.headers.get("content-type")).toBe("application/pdf");
     expect(await file.text()).toBe(bytes);
+  });
+  it("runs an AI vision scan, stores keyframes and keeps the report off the certified record", async () => {
+    const bytes = (values: number[]) => new Uint8Array(values).buffer;
+    const jpeg = bytes([255, 216, 255, 224, 0, 16, 74, 70, 73, 70, 0]);
+    const scan = async (
+      cookie: string,
+      metadata: Record<string, unknown>,
+      frameBytes: ArrayBuffer = jpeg,
+    ) => {
+      const form = new FormData();
+      form.append("metadata", JSON.stringify(metadata));
+      form.append(
+        "frame",
+        new File([frameBytes], "frame-0.jpg", { type: "image/jpeg" }),
+      );
+      const encoded = new Request("http://localhost/api/scans", {
+        method: "POST",
+        headers: { Cookie: cookie },
+        body: form,
+      });
+      const response = await mf.dispatchFetch(encoded.url, {
+        method: "POST",
+        headers: Object.fromEntries(encoded.headers),
+        body: await encoded.arrayBuffer(),
+      });
+      return {
+        status: response.status,
+        json: (await response.json()) as {
+          data: Scan;
+          error: { message: string };
+        },
+      };
+    };
+    const metadata = {
+      mode: "DIGITAL_TWIN",
+      apiaryId: "apiary-lidder",
+      hiveId: "HIVE-0042",
+      source: "camera",
+      captureDigest: `0x${"3d".repeat(32)}`,
+      durationSeconds: 11.2,
+      frameCount: 1,
+      notes: "",
+    };
+    expect((await scan(authorityCookie, metadata)).status).toBe(403);
+    expect(
+      (await scan(producerCookie, { ...metadata, hiveId: "HIVE-OTHER" }))
+        .status,
+    ).toBe(404);
+    expect(
+      (
+        await scan(producerCookie, {
+          ...metadata,
+          mode: "DIGITAL_TWIN",
+          hiveId: null,
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (await scan(producerCookie, metadata, bytes([1, 2, 3, 4]))).status,
+    ).toBe(422);
+    const created = await scan(producerCookie, metadata);
+    expect(created.status).toBe(201);
+    const stored = created.json.data;
+    expect(stored.report.twin?.sensorWeight).toBe(null);
+    expect(stored.report.simulated).toBe(true);
+    expect(stored.classification).toBe(
+      stored.score <= 30 ? "LOW" : stored.score <= 70 ? "MEDIUM" : "HIGH",
+    );
+    const repeated = await scan(producerCookie, metadata);
+    expect(repeated.json.data.score).toBe(stored.score);
+    const frame = await mf.dispatchFetch(
+      `http://localhost/api/scans/${stored.publicId}/frames/0`,
+      { headers: { Cookie: producerCookie } },
+    );
+    expect(frame.headers.get("content-type")).toBe("image/jpeg");
+    expect(
+      (
+        await request(`/scans/${stored.publicId}/frames/4`, {
+          cookie: producerCookie,
+        })
+      ).status,
+    ).toBe(404);
+    const list = await request<Scan[]>("/scans?mode=DIGITAL_TWIN", {
+      cookie: producerCookie,
+    });
+    expect(list.data.some((s) => s.publicId === stored.publicId)).toBe(true);
+    const batch = await request<Batch>("/batches/BH-2026-000042", {
+      cookie: producerCookie,
+    });
+    expect(JSON.stringify(batch.data.record)).not.toContain("vision-sim");
+    const forecast = await request<ReputationForecast>("/scans/forecast", {
+      cookie: producerCookie,
+    });
+    expect(forecast.status).toBe(200);
+    expect(forecast.data.version).toBe("beehive.market-signal.v1");
+    expect(forecast.data.signals.length).toBeGreaterThan(0);
   });
   it("enforces per-client rate limits with retry guidance", async () => {
     const db = await mf.getD1Database("DB");

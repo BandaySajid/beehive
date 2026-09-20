@@ -49,7 +49,8 @@ Do this only when that PID file exists and the process is the BeeHive local node
 8. Click **Simulate Database Tampering**. Only the golden record quantity becomes **250 kg**. The blockchain remains unchanged. Open or reload its public passport: **TAMPERED**.
 9. Open **Authority console → Alerts & reviews**. Review the integrity incident, inspect the record, and save a decision with notes.
 10. Return to **Tamper lab → Restore Demo**. The exact snapshot is restored only after its hash matches the chain. The passport returns **AUTHENTIC**; audit and incident history are preserved.
-11. On the homepage, play the trust-chain animation. Pause, restart or click a stage. Open `/architecture` and select **Create Batch**, **Verify Batch**, **Hive Alert**, or **Tampering Attack**.
+11. Open **AI vision scan**. Pick a mode, record a short clip or upload one, and run the analysis: keyframes are extracted in the browser and returned as a field report with detections drawn on the frames. Open **SCAN-TWIN001** from the history for the digital twin, and **Risk forecast** for the review-driven prediction.
+12. On the homepage, play the trust-chain animation. Pause, restart or click a stage. Open `/architecture` and select **Create Batch**, **Verify Batch**, **Hive Alert**, or **Tampering Attack**.
 
 The lab is gated by **both `DEMO_MODE=true` and the admin role** and is limited to the golden seeded record. Ordinary producers cannot invoke it. The animated walkthrough uses visibly labeled illustrative hashes; the application and proof drawer use real computed hashes and transaction receipts.
 
@@ -107,6 +108,8 @@ The frontend uses React Router, Tailwind CSS, Radix Dialog, Framer Motion, Recha
 | `verification_events`               | Every verification verdict and both compared hashes            |
 | `hive_alerts`, `authority_reviews`  | Hive, risk and integrity incidents plus decisions              |
 | `audit_logs`                        | Historical actions, actors, entity references and explanations |
+| `hive_scans`                        | Vision captures, R2 keyframe keys and the stored scan report    |
+| `consumer_reviews`                  | Market feedback behind the risk forecast                        |
 | `rate_limits`                       | Atomic per-client and per-minute request budgets               |
 
 The migration enables foreign keys and adds producer/time indexes and partial uniqueness constraints for open alerts. Ordinary API operations do not overwrite certified records. Assessment creation and state transitions use D1 transactions. Demo restoration resolves incidents without deleting history.
@@ -120,6 +123,26 @@ Features include per-hive quantity, moisture ranges, certificate availability, m
 The golden score of 18 comprises **10 points for no attached certificate + 8 points for missing optional lab values**. The demo does not pretend to possess a laboratory report it does not have. High-risk batches may still receive a fingerprint: anchoring records what was submitted, including the risk assessment; it does not approve the product. Authorities receive high-risk cases.
 
 Workers AI is deliberately optional and not required or called. Deterministic, readable explanations are always available. Neither the AI nor the blockchain can establish physical honey purity from metadata.
+
+
+## AI vision scan (prototype simulation)
+
+`packages/scan-engine/` powers the producer's field intelligence. A clip is recorded or uploaded, **the browser extracts keyframes and a SHA-256 capture fingerprint, and only those keyframes leave the device** — the video is never uploaded or stored. The fingerprint seeds a deterministic model, so the same clip always returns the same report, and every mode is grounded in the hive's real telemetry and the apiary's registered coordinates.
+
+| Mode | Answers |
+| --- | --- |
+| Honey & comb | Is this frame ready to extract? Capping, estimated moisture, colour, debris, readiness. |
+| Environment & placement | Where should the next hive stand go? Suitability, forage, sun, wind, water, three ranked stands. |
+| Disease & pest | What is building in this colony? Ranked signatures, mite load, brood pattern, treatment windows. |
+| Digital twin | What is in the box? Structure, per-frame roles, population, stores, a weight breakdown reconciled against the load cell, and 30/60/90-day weight, yield and disease projections. |
+
+A HIGH result opens a `VISION_SCAN` alert for the producer and the authority console. Reports are labelled as simulated in the interface and in the payload's `scope` field.
+
+**Trust boundary:** no vision output and no consumer review is ever part of the canonical record, the SHA-256 fingerprint, or the contract. Swapping the simulation for a real model means replacing `simulateScan` and keeping the `ScanReport` shape.
+
+## Market risk forecast (no video)
+
+`packages/scan-engine/src/forecast.ts` predicts reputational exposure from consumer reviews plus real platform signals: public verification verdicts, anchored-proof coverage, average certified batch risk and open alerts. Every driver reports the points it contributes and why, complaint themes are clustered from low-rated reviews, and the score is projected over 30/60/90 days. In demo mode, **Receive a consumer review** delivers an inbound review so the forecast can be watched moving.
 
 ## Canonical record and hashing
 
@@ -166,6 +189,8 @@ All responses use `{ success, data, requestId }` or `{ success: false, error: { 
 | Public     | `GET /api/verify/:publicId`; demo-only `GET /api/public/preview`                              |
 | Authority  | `GET /api/authority/overview`, `/alerts`, `/records`; `POST /api/authority/alerts/:id/review` |
 | Demo admin | `POST /api/demo/tamper/:id`, `/reset/:id`                                                     |
+| Vision     | `GET/POST /api/scans`; `GET /api/scans/:id`, `/api/scans/:id/frames/:index`                   |
+| Forecast   | `GET /api/scans/forecast`, `/api/scans/reviews`; demo-only `POST /api/scans/reviews/simulate` |
 | Dashboard  | `GET /api/dashboard/metrics`; `GET /api/activity`                                             |
 
 ### ESP32 integration
@@ -197,6 +222,7 @@ For testing the normal password form, local generated credentials are in ignored
 - Atomic D1 request budgets: 30 authentication requests / minute and 240 other API requests / minute per client. IoT supports non-browser authenticated requests.
 - Parameterized D1 queries; no client-selected SQL identifiers.
 - Upload limits, MIME allowlist, file-signature checks, random object keys, ownership checks and attachment downloads. Evidence is never executable HTML.
+- Scan captures stay on the device: only browser-extracted keyframes are uploaded, with the same MIME allowlist, signature checks and per-producer download protection as evidence. Vision reports and consumer reviews are excluded from every certified payload.
 - Keys remain in ignored local files or Worker secrets; QR codes contain URLs only.
 - Demo controls require admin authorization and an explicit demo environment, and target only the golden record.
 - Certificate fingerprints commit uploaded bytes. Public record integrity does not validate laboratory accreditation or the truth of producer-submitted data.
@@ -206,7 +232,7 @@ This is a competition prototype, not a completed regulatory accreditation, calib
 ## Checks
 
 ```bash
-npm run test           # SHA-256, canonicalization, risk, real Worker + D1 + R2 + isolated EVM
+npm run test           # SHA-256, canonicalization, risk, vision/forecast engines, real Worker + D1 + R2 + isolated EVM
 npm run typecheck
 npm run build
 npm run deploy:check   # local Worker package dry-run; does not deploy

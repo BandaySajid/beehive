@@ -20,6 +20,11 @@ const BatchDetail = lazy(() =>
   import("./pages/Batches").then((m) => ({ default: m.BatchDetail })),
 );
 const BatchWizard = lazy(() => import("./pages/BatchWizard"));
+const Scan = lazy(() => import("./pages/Scan"));
+const ScanDetail = lazy(() =>
+  import("./pages/Scan").then((m) => ({ default: m.ScanDetail })),
+);
+const Forecast = lazy(() => import("./pages/Forecast"));
 const Verify = lazy(() => import("./pages/Verify"));
 const VerifyResult = lazy(() =>
   import("./pages/Verify").then((m) => ({ default: m.VerifyResult })),
@@ -97,6 +102,9 @@ export default function App() {
                 <Route path="/batches" element={<Batches />} />
                 <Route path="/batches/new" element={<BatchWizard />} />
                 <Route path="/batches/:id" element={<BatchDetail />} />
+                <Route path="/scan" element={<Scan />} />
+                <Route path="/scan/:id" element={<ScanDetail />} />
+                <Route path="/forecast" element={<Forecast />} />
                 <Route path="/demo/tamper" element={<Tamper />} />
                 <Route path="/authority" element={<Authority />} />
                 <Route path="/authority/alerts" element={<AuthorityAlerts />} />

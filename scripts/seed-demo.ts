@@ -7,6 +7,10 @@ import {
   hashRecord,
 } from "../packages/shared/src/canonical";
 import { assessRisk } from "../packages/risk-engine/src/index";
+import {
+  simulateScan,
+  SCAN_ENGINE_VERSION,
+} from "../packages/scan-engine/src/index";
 import type { CertifiedRecord } from "../packages/shared/src/index";
 import { goldenRecord } from "../tests/fixtures";
 import {
@@ -408,9 +412,274 @@ for (let i = 0; i < 36; i++) {
       created_at: createdAt,
     });
 }
+const reviewTemplates = [
+  {
+    rating: 5,
+    channel: "Marketplace",
+    title: "Exactly what the passport said",
+    body: "Scanned the code before opening. Origin, hive and harvest date all matched, and the acacia flavour is clean.",
+    tags: ["authenticity"],
+    verified: 1,
+  },
+  {
+    rating: 5,
+    channel: "Direct order",
+    title: "Repeat order, same quality",
+    body: "Third jar from this apiary. Consistent colour and no separation after two months on the shelf.",
+    tags: ["consistency"],
+    verified: 1,
+  },
+  {
+    rating: 4,
+    channel: "Retail partner",
+    title: "Very good, slightly thick",
+    body: "Flavour is excellent. It started granulating near the bottom after a few weeks, which is normal but worth mentioning.",
+    tags: ["crystallisation"],
+    verified: 0,
+  },
+  {
+    rating: 2,
+    channel: "Marketplace",
+    title: "Set solid within three weeks",
+    body: "The whole jar crystallised. Warming it fixes the texture but it does not look like the product photos.",
+    tags: ["crystallisation", "consistency"],
+    verified: 0,
+  },
+  {
+    rating: 5,
+    channel: "Marketplace",
+    title: "The QR passport sold me",
+    body: "Being able to see the hive and the blockchain record before buying is the reason I chose this over a cheaper jar.",
+    tags: ["authenticity"],
+    verified: 1,
+  },
+  {
+    rating: 3,
+    channel: "Retail partner",
+    title: "Lid arrived sticky",
+    body: "Honey itself is good but the seal leaked in transit and the outer carton was stained.",
+    tags: ["packaging", "delivery"],
+    verified: 0,
+  },
+  {
+    rating: 4,
+    channel: "Direct order",
+    title: "Good honey, label could be clearer",
+    body: "The batch number on the label is tiny. Took a while to match it to the passport page.",
+    tags: ["labelling"],
+    verified: 1,
+  },
+  {
+    rating: 1,
+    channel: "Marketplace",
+    title: "Not sure this is raw",
+    body: "Tastes thinner than the last batch and pours very fast. Would like to see a laboratory certificate.",
+    tags: ["authenticity", "taste"],
+    verified: 0,
+  },
+  {
+    rating: 5,
+    channel: "Farmers market",
+    title: "Bought after meeting the beekeeper",
+    body: "Saw the hive telemetry on the stall tablet. Honey is fragrant and the colour is a true light amber.",
+    tags: [],
+    verified: 1,
+  },
+  {
+    rating: 4,
+    channel: "Marketplace",
+    title: "Worth the price",
+    body: "Costlier than supermarket honey, but the traceability and the taste justify it.",
+    tags: ["price"],
+    verified: 1,
+  },
+  {
+    rating: 3,
+    channel: "Direct order",
+    title: "Slow delivery in the hills",
+    body: "Nine days to arrive. The honey was fine, the courier was not.",
+    tags: ["delivery"],
+    verified: 0,
+  },
+  {
+    rating: 5,
+    channel: "Retail partner",
+    title: "Consistent across two lots",
+    body: "Stocked two different batch numbers this season and customers could not tell them apart. That is a compliment.",
+    tags: ["consistency"],
+    verified: 1,
+  },
+];
+const reviewers = [
+  "Ananya K.",
+  "Rahul M.",
+  "Iqra B.",
+  "Devendra P.",
+  "Sneha T.",
+  "Imran Q.",
+  "Lakshmi R.",
+  "Tenzin D.",
+  "Harpreet K.",
+  "Vikram S.",
+  "Nusrat J.",
+  "Arjun V.",
+  "Kavya N.",
+  "Zoya A.",
+  "Manish G.",
+  "Pooja L.",
+];
+const reviewCounts: Record<string, number> = {
+  "producer-mountain": 46,
+  "producer-doaba": 17,
+  "producer-kumaon": 11,
+};
+const anchoredBatches: Record<string, string[]> = {
+  "producer-mountain": ["batch-42", "batch-104", "batch-110"],
+  "producer-doaba": ["batch-105", "batch-111"],
+  "producer-kumaon": ["batch-109", "batch-118"],
+};
+for (const producer of producers) {
+  const total = reviewCounts[producer.id] ?? 0;
+  for (let i = 0; i < total; i++) {
+    const template =
+      reviewTemplates[(i * 5 + producer.name.length) % reviewTemplates.length];
+    // Recent months carry proportionally more of the low ratings so the trend line has something to say.
+    const daysAgo = Math.round((i / Math.max(1, total - 1)) * 168) + (i % 3);
+    const createdAt = new Date(
+      baseDate.getTime() - daysAgo * 86400000,
+    ).toISOString();
+    const batches = anchoredBatches[producer.id] ?? [];
+    insert("consumer_reviews", {
+      id: `review-${producer.id}-${i}`,
+      producer_id: producer.id,
+      batch_id:
+        i % 3 === 0 && batches.length ? batches[i % batches.length] : null,
+      reviewer: reviewers[(i * 3) % reviewers.length],
+      channel: template.channel,
+      rating: template.rating,
+      title: template.title,
+      body: template.body,
+      sentiment:
+        template.rating >= 4
+          ? "positive"
+          : template.rating === 3
+            ? "neutral"
+            : "negative",
+      tags: JSON.stringify(template.tags),
+      verified_scan: template.verified,
+      created_at: createdAt,
+    });
+  }
+}
+const seededScans = [
+  {
+    id: "scan-honey-001",
+    publicId: "SCAN-HONEY01",
+    mode: "HONEY_QUALITY" as const,
+    hive: hiveRecords[4],
+    digest: `0x${"a4".repeat(32)}`,
+    daysAgo: 2,
+    duration: 11.4,
+    notes: "Pre-harvest sweep of the acacia super.",
+  },
+  {
+    id: "scan-disease-001",
+    publicId: "SCAN-BROOD01",
+    mode: "DISEASE" as const,
+    hive: hiveRecords[3],
+    digest: `0x${"7c".repeat(32)}`,
+    daysAgo: 1,
+    duration: 9.8,
+    notes: "Follow-up after the temperature alert.",
+  },
+  {
+    id: "scan-twin-001",
+    publicId: "SCAN-TWIN001",
+    mode: "DIGITAL_TWIN" as const,
+    hive: hiveRecords[4],
+    digest: `0x${"5e".repeat(32)}`,
+    daysAgo: 4,
+    duration: 12,
+    notes: "Full frame-by-frame reconstruction before the flow.",
+  },
+  {
+    id: "scan-site-001",
+    publicId: "SCAN-SITE001",
+    mode: "ENVIRONMENT" as const,
+    hive: null,
+    digest: `0x${"2b".repeat(32)}`,
+    daysAgo: 6,
+    duration: 10.6,
+    notes: "Candidate site above the Lidder tree line.",
+  },
+];
+for (const scan of seededScans) {
+  const producer = scan.hive?.producer ?? producers[0];
+  const createdAt = new Date(
+    baseDate.getTime() - scan.daysAgo * 86400000,
+  ).toISOString();
+  const report = simulateScan(scan.mode, scan.digest, {
+    hive: scan.hive
+      ? {
+          publicId: scan.hive.publicId,
+          name: scan.hive.name,
+          status: scan.hive.status,
+          healthScore:
+            scan.hive.status === "Alert"
+              ? 41
+              : scan.hive.status === "Watch"
+                ? 68
+                : 88,
+          temperature: scan.hive.status === "Alert" ? 42.6 : 34.1,
+          humidity: scan.hive.status === "Alert" ? 84 : 56,
+          weight: 38.4,
+          activity: 82,
+          species: "Apis mellifera",
+          queenAge: 10,
+        }
+      : null,
+    apiary: {
+      name: producer.apiaryName,
+      location: producer.region,
+      latitude: producer.lat,
+      longitude: producer.lng,
+    },
+    durationSeconds: scan.duration,
+    frameCount: 4,
+    now: createdAt,
+  });
+  insert("hive_scans", {
+    id: scan.id,
+    public_id: scan.publicId,
+    producer_id: producer.id,
+    apiary_id: producer.apiary,
+    hive_id: scan.hive?.id ?? null,
+    mode: scan.mode,
+    source: "camera",
+    capture_digest: scan.digest,
+    duration_seconds: scan.duration,
+    frame_count: 4,
+    frame_keys: "[]",
+    score: report.score,
+    classification: report.classification,
+    report_json: JSON.stringify(report),
+    engine_version: SCAN_ENGINE_VERSION,
+    notes: scan.notes,
+    created_at: createdAt,
+  });
+  insert("audit_logs", {
+    id: `audit-${scan.id}`,
+    user_id: "demo-producer",
+    producer_id: producer.id,
+    action: "AI vision scan completed",
+    entity_id: scan.id,
+    detail: `${scan.mode}: ${report.score}/100 ${report.classification}; ${SCAN_ENGINE_VERSION}`,
+    created_at: createdAt,
+  });
+}
 execute(sql, "demo-seed");
 console.log(
-  "Seeded 3 producers, 3 apiaries, 10 hives, 840 readings and 36 internally linked batches.",
+  "Seeded 3 producers, 3 apiaries, 10 hives, 840 readings, 36 internally linked batches, 74 consumer reviews and 4 AI vision scans.",
 );
 const vars = readFileSync("apps/worker/.dev.vars", "utf8");
 const address = vars.match(/^CONTRACT_ADDRESS="(.+)"$/m)?.[1];

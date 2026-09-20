@@ -132,3 +132,77 @@ export function DataBars({
     </div>
   );
 }
+export function ReviewTrendChart({
+  monthly,
+}: {
+  monthly: {
+    month: string;
+    averageRating: number;
+    reviews: number;
+    score: number;
+  }[];
+}) {
+  return (
+    <div
+      className="chart-frame small-chart"
+      role="img"
+      aria-label="Consumer rating and predicted risk by month"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={monthly}
+          margin={{ top: 15, right: 12, left: -24, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient id="fill-rating" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#819675" stopOpacity={0.26} />
+              <stop offset="100%" stopColor="#819675" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            vertical={false}
+            stroke="#e9e9e2"
+            strokeDasharray="3 5"
+          />
+          <XAxis
+            dataKey="month"
+            tickFormatter={(v) =>
+              new Date(`${v}-01T00:00:00Z`).toLocaleDateString("en-IN", {
+                month: "short",
+              })
+            }
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: "#85877c" }}
+          />
+          <YAxis
+            domain={[0, 5]}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: "#85877c" }}
+          />
+          <Tooltip
+            contentStyle={{
+              borderRadius: 10,
+              border: "1px solid #e4e5dd",
+              fontSize: 12,
+            }}
+            formatter={(value, name) =>
+              name === "averageRating"
+                ? [`${Number(value).toFixed(2)} ★`, "Average rating"]
+                : [String(value), "Reviews"]
+            }
+          />
+          <Area
+            type="monotone"
+            dataKey="averageRating"
+            stroke="#819675"
+            strokeWidth={2}
+            fill="url(#fill-rating)"
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

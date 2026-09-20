@@ -8,6 +8,7 @@ import {
   MapPin,
   Plus,
   Radio,
+  ScanEye,
   Thermometer,
   Weight,
   Wind,
@@ -35,7 +36,9 @@ import type {
   Batch,
   Hive,
   Reading,
+  Scan,
 } from "../../../../packages/shared/src/index";
+import { SCAN_MODE_LABELS } from "../../../../packages/shared/src/index";
 const TelemetryChart = lazy(() =>
   import("../components/Charts").then((m) => ({ default: m.TelemetryChart })),
 );
@@ -303,6 +306,7 @@ export function HiveDetail() {
     alerts: { id: string; title: string; detail: string }[];
   }>(`/hives/${id}`, 15000);
   const { data: batches } = useApi<Batch[]>("/batches");
+  const { data: scans } = useApi<Scan[]>(`/scans?hiveId=${id}`);
   const { data: health } = useApi<{ demoMode: boolean }>("/health");
   const { data: user } = useUser();
   const { mutate: globalMutate } = useSWRConfig();
@@ -507,6 +511,44 @@ export function HiveDetail() {
           ))}
         </Panel>
       ) : null}
+      <Panel
+        title="AI vision scans"
+        subtitle="Simulated prototype reports from recorded clips of this colony"
+        action={
+          <SectionLink to={`/scan?hive=${hive.public_id}`}>
+            New scan
+          </SectionLink>
+        }
+      >
+        {scans?.length ? (
+          <div className="source-batches">
+            {scans.slice(0, 4).map((scan) => (
+              <Link key={scan.id} to={`/scan/${scan.publicId}`}>
+                <span>
+                  <strong>{SCAN_MODE_LABELS[scan.mode].title}</strong>
+                  <small>
+                    {scan.publicId} ·{" "}
+                    {new Date(scan.createdAt).toLocaleDateString("en-IN")}
+                  </small>
+                </span>
+                <Status value={scan.classification} />
+                <ArrowUpRight size={17} />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="alert-inline">
+            <ScanEye size={20} />
+            <div>
+              <strong>No scan yet for this colony</strong>
+              <p>
+                Record a short clip to estimate disease pressure, honey
+                readiness or a full digital twin.
+              </p>
+            </div>
+          </div>
+        )}
+      </Panel>
       <Panel
         title="Honey from this hive"
         action={<SectionLink to="/batches/new">Create batch</SectionLink>}

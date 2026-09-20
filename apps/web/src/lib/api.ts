@@ -33,6 +33,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(response.status, payload.error.message);
   return payload.data;
 }
+export const apiUrl = (path: string) => `${base}/api${path}`;
 export const post = <T>(path: string, data: unknown = {}) =>
   api<T>(path, { method: "POST", body: JSON.stringify(data) });
 export async function downloadDocument(id: string, filename: string) {
